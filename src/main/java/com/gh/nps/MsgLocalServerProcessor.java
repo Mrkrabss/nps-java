@@ -71,13 +71,13 @@ public class MsgLocalServerProcessor extends ChannelInboundHandlerAdapter {
         connectId_channel.remove(connectPortRequestMsg.connectId);
         Client.ctx.channel().writeAndFlush(connectPortResponseMsg);
     }
-    static volatile int readCount = 0;
+    volatile int readCount = 0;
 
     @Override
     public void channelRead(final ChannelHandlerContext ctx, Object msg) throws Exception {
         final int size=((ByteBuf) msg).readableBytes();
         readCount+=size;
-        if(readCount>=1024*1024*10){
+        if(readCount>=1024*1024*2){
             ctx.channel().config().setAutoRead(false);
         }
         ByteBuf tmp = ByteBufAllocator.DEFAULT.buffer();

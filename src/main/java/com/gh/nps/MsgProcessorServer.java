@@ -31,22 +31,21 @@ public class MsgProcessorServer extends ChannelInboundHandlerAdapter {
             }
         }, 3, TimeUnit.SECONDS);
         // ctx.executor().scheduleAtFixedRate(new Runnable(){
-        //     @Override
-        //     public void run() {
-        //         ctx.flush();
-        //     }
+        // @Override
+        // public void run() {
+        // ctx.flush();
+        // }
         // }, 500, 500, TimeUnit.MILLISECONDS);
     }
-
-
 
     @Override
     public void channelInactive(final ChannelHandlerContext ctx) throws Exception {
         super.channelInactive(ctx);
         System.out.println("channelInactive");
         if (ctx.channel().hasAttr(ClientInfo.CLIENT_INFO)) {
-            ChannelHandlerContext channelHandlerContext=id_channel.get(ctx.channel().attr(ClientInfo.CLIENT_INFO).get().helloMsg.userId);
-            if(channelHandlerContext==ctx){
+            ChannelHandlerContext channelHandlerContext = id_channel
+                    .get(ctx.channel().attr(ClientInfo.CLIENT_INFO).get().helloMsg.userId);
+            if (channelHandlerContext == ctx) {
                 id_channel.remove(ctx.channel().attr(ClientInfo.CLIENT_INFO).get().helloMsg.userId);
             }
             for (final Long connectId : ctx.channel().attr(ClientInfo.CLIENT_INFO).get().connectId_Channel.keySet()) {
@@ -74,12 +73,10 @@ public class MsgProcessorServer extends ChannelInboundHandlerAdapter {
 
     // @Override
     // public void channelReadComplete(ChannelHandlerContext ctx) throws Exception {
-    //     ctx.flush();
+    // ctx.flush();
     // }
 
     volatile int readCount = 0;
-
-
 
     @Override
     public void channelRead(final ChannelHandlerContext ctx, final Object msg) throws Exception {
@@ -108,9 +105,9 @@ public class MsgProcessorServer extends ChannelInboundHandlerAdapter {
             }
             if (message.type == -1) {
                 DataMsg dataMsg = (DataMsg) message;
-                final int size=dataMsg.data.readableBytes();
-                readCount+=size;
-                if(readCount>=1024*1024*5){
+                final int size = dataMsg.data.readableBytes();
+                readCount += size;
+                if (readCount >= 1024 * 1024 * 2) {
                     ctx.channel().config().setAutoRead(false);
                 }
                 ChannelHandlerContext dst = ctx.channel().attr(ClientInfo.CLIENT_INFO).get().connectId_Channel
@@ -119,8 +116,8 @@ public class MsgProcessorServer extends ChannelInboundHandlerAdapter {
                     dst.writeAndFlush(dataMsg).addListener(new GenericFutureListener<Future<? super Void>>() {
                         @Override
                         public void operationComplete(Future<? super Void> future) throws Exception {
-                            readCount-=size;
-                            if(readCount<1024*1024){
+                            readCount -= size;
+                            if (readCount < 1024 * 1024) {
                                 ctx.channel().config().setAutoRead(true);
                                 ctx.channel().read();
                             }
@@ -128,11 +125,11 @@ public class MsgProcessorServer extends ChannelInboundHandlerAdapter {
                     });
                 } else {
                     ReferenceCountUtil.release(dataMsg.data);
-                    readCount-=size;
-                            if(readCount<1024*1024){
-                                ctx.channel().config().setAutoRead(true);
-                                ctx.channel().read();
-                            }
+                    readCount -= size;
+                    if (readCount < 1024 * 1024) {
+                        ctx.channel().config().setAutoRead(true);
+                        ctx.channel().read();
+                    }
                 }
                 return;
             }

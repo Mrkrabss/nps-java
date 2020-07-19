@@ -43,13 +43,6 @@ public class MsgProcessorClient extends ChannelInboundHandlerAdapter {
         helloMsg.clientType = clientType;
         ctx.channel().writeAndFlush(helloMsg);
         Client.ctx=ctx;
-        scheduleAtFixedRate = ctx.executor().scheduleAtFixedRate(new Runnable(){
-        
-            @Override
-            public void run() {
-                
-            }
-        }, 0, 1, TimeUnit.SECONDS);
     }
 
     @Override

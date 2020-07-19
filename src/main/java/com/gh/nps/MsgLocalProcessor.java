@@ -43,13 +43,13 @@ public class MsgLocalProcessor extends ChannelInboundHandlerAdapter {
         out.channel().writeAndFlush(connectPortResponseMsg);
     }
 
-    static AtomicInteger readCount = new AtomicInteger();
+    AtomicInteger readCount = new AtomicInteger();
 
     @Override
     public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
         int size = ((ByteBuf) msg).readableBytes();
         int current = readCount.addAndGet(size);
-        if (current > 1024 * 2014 * 1024 * 10 && ctx.channel().config().isAutoRead()) {
+        if (current > 1024 * 2014 * 1024 * 2 && ctx.channel().config().isAutoRead()) {
             ctx.channel().config().setAutoRead(false);
         }
         ByteBuf tmp = ByteBufAllocator.DEFAULT.buffer();
@@ -59,7 +59,7 @@ public class MsgLocalProcessor extends ChannelInboundHandlerAdapter {
         tmp.writeBytes((ByteBuf) msg);
         out.writeAndFlush(tmp);
         current = readCount.addAndGet(-size);
-        if (current < 1024 * 2014 * 1024 * 10 && !ctx.channel().config().isAutoRead()) {
+        if (current < 1024 * 2014 * 1024 && !ctx.channel().config().isAutoRead()) {
             ctx.channel().config().setAutoRead(true);
             ctx.channel().read();
         }
