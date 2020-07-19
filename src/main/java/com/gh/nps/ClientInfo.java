@@ -9,6 +9,6 @@ public class ClientInfo {
     public static AttributeKey<ClientInfo> CLIENT_INFO = AttributeKey.valueOf("ClientInfo");
     public HelloMsg helloMsg;
     public ConcurrentHashMap<Long,ChannelHandlerContext> connectId_Channel=new ConcurrentHashMap<>();
-
+    public boolean needCheckRead =false;
     
 }

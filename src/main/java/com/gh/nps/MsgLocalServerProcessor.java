@@ -13,6 +13,8 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.util.AttributeKey;
 import io.netty.util.ReferenceCountUtil;
+import io.netty.util.concurrent.Future;
+import io.netty.util.concurrent.GenericFutureListener;
 
 public class MsgLocalServerProcessor extends ChannelInboundHandlerAdapter {
     ConnectPortRequestMsg connectPortRequestMsg;
@@ -69,17 +71,31 @@ public class MsgLocalServerProcessor extends ChannelInboundHandlerAdapter {
         connectId_channel.remove(connectPortRequestMsg.connectId);
         Client.ctx.channel().writeAndFlush(connectPortResponseMsg);
     }
+    static volatile int readCount = 0;
 
     @Override
-    public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
+    public void channelRead(final ChannelHandlerContext ctx, Object msg) throws Exception {
+        final int size=((ByteBuf) msg).readableBytes();
+        readCount+=size;
+        if(readCount>=1024*1024*10){
+            ctx.channel().config().setAutoRead(false);
+        }
         ByteBuf tmp = ByteBufAllocator.DEFAULT.buffer();
         tmp.writeInt(-1);
         tmp.writeLong(connectPortRequestMsg.connectId);
         tmp.ensureWritable(((ByteBuf) msg).readableBytes());            
-        System.out.println("包大小："+((ByteBuf) msg).readableBytes());
         tmp.writeBytes(((ByteBuf) msg), ((ByteBuf) msg).readableBytes());
         if (Client.ctx != null) {
-            Client.ctx.channel().writeAndFlush(tmp);
+            Client.ctx.channel().writeAndFlush(tmp).addListener(new GenericFutureListener<Future<? super Void>>() {
+                @Override
+                public void operationComplete(Future<? super Void> future) throws Exception {
+                    readCount-=size;
+                    if(readCount<1024*1024){
+                        ctx.channel().config().setAutoRead(true);
+                        ctx.channel().read();
+                    }
+                }
+            });
         } else {
             ctx.channel().close();
         }

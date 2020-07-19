@@ -1,6 +1,7 @@
 package com.gh.nps;
 
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
@@ -14,11 +15,12 @@ public class MsgLocalProcessor extends ChannelInboundHandlerAdapter {
     String myId;
     ConcurrentHashMap<Long, Channel> connectId_channel;
 
-    public MsgLocalProcessor(long connectId, ChannelHandlerContext out,String myId,ConcurrentHashMap<Long, Channel> connectId_channel) {
+    public MsgLocalProcessor(long connectId, ChannelHandlerContext out, String myId,
+            ConcurrentHashMap<Long, Channel> connectId_channel) {
         this.connectId = connectId;
         this.out = out;
-        this.myId=myId;
-        this.connectId_channel=connectId_channel;
+        this.myId = myId;
+        this.connectId_channel = connectId_channel;
     }
 
     @Override
@@ -41,20 +43,31 @@ public class MsgLocalProcessor extends ChannelInboundHandlerAdapter {
         out.channel().writeAndFlush(connectPortResponseMsg);
     }
 
+    static AtomicInteger readCount = new AtomicInteger();
+
     @Override
     public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
+        int size = ((ByteBuf) msg).readableBytes();
+        int current = readCount.addAndGet(size);
+        if (current > 1024 * 2014 * 1024 * 10 && ctx.channel().config().isAutoRead()) {
+            ctx.channel().config().setAutoRead(false);
+        }
         ByteBuf tmp = ByteBufAllocator.DEFAULT.buffer();
         tmp.writeInt(-1);
         tmp.writeLong(connectId);
         tmp.ensureWritable(((ByteBuf) msg).readableBytes());
         tmp.writeBytes((ByteBuf) msg);
         out.writeAndFlush(tmp);
+        current = readCount.addAndGet(-size);
+        if (current < 1024 * 2014 * 1024 * 10 && !ctx.channel().config().isAutoRead()) {
+            ctx.channel().config().setAutoRead(true);
+            ctx.channel().read();
+        }
     }
 
     @Override
     public void channelReadComplete(ChannelHandlerContext ctx) throws Exception {
         super.channelReadComplete(ctx);
-        
     }
 
     @Override

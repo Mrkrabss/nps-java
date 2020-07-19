@@ -34,7 +34,7 @@ public class Client {
     public static void main(String[] args) throws Exception {
         // Client name 被控端启动命令
         // Client name ip:port:port:name
-        args = new String[] { "", "127.0.0.1:8080:2000:android","127.0.0.1:5555:5555:android","127.0.0.1:8022:2200:android","127.0.0.1:80:2003:123" };
+        args = new String[] { "", "127.0.0.1:8080:2000:android_test","127.0.0.1:5555:5555:android","127.0.0.1:8022:2200:android_test","127.0.0.1:80:2003:123" };
         // args=new String[]{};
         final Client client = new Client();
         if (args.length > 1) {

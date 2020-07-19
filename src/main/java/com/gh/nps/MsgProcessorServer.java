@@ -3,6 +3,7 @@ package com.gh.nps;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
+import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandlerContext;
@@ -10,6 +11,8 @@ import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.handler.timeout.IdleState;
 import io.netty.handler.timeout.IdleStateEvent;
 import io.netty.util.ReferenceCountUtil;
+import io.netty.util.concurrent.Future;
+import io.netty.util.concurrent.GenericFutureListener;
 
 public class MsgProcessorServer extends ChannelInboundHandlerAdapter {
     static String myId = "server";
@@ -74,6 +77,10 @@ public class MsgProcessorServer extends ChannelInboundHandlerAdapter {
     //     ctx.flush();
     // }
 
+    volatile int readCount = 0;
+
+
+
     @Override
     public void channelRead(final ChannelHandlerContext ctx, final Object msg) throws Exception {
         super.channelRead(ctx, msg);
@@ -101,12 +108,31 @@ public class MsgProcessorServer extends ChannelInboundHandlerAdapter {
             }
             if (message.type == -1) {
                 DataMsg dataMsg = (DataMsg) message;
+                final int size=dataMsg.data.readableBytes();
+                readCount+=size;
+                if(readCount>=1024*1024*5){
+                    ctx.channel().config().setAutoRead(false);
+                }
                 ChannelHandlerContext dst = ctx.channel().attr(ClientInfo.CLIENT_INFO).get().connectId_Channel
                         .get(dataMsg.connectId);
                 if (dst != null) {
-                    dst.writeAndFlush(dataMsg);
+                    dst.writeAndFlush(dataMsg).addListener(new GenericFutureListener<Future<? super Void>>() {
+                        @Override
+                        public void operationComplete(Future<? super Void> future) throws Exception {
+                            readCount-=size;
+                            if(readCount<1024*1024){
+                                ctx.channel().config().setAutoRead(true);
+                                ctx.channel().read();
+                            }
+                        }
+                    });
                 } else {
                     ReferenceCountUtil.release(dataMsg.data);
+                    readCount-=size;
+                            if(readCount<1024*1024){
+                                ctx.channel().config().setAutoRead(true);
+                                ctx.channel().read();
+                            }
                 }
                 return;
             }
