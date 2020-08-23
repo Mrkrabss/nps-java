@@ -34,12 +34,15 @@ public class Client {
     public static void main(String[] args) throws Exception {
         // Client name 被控端启动命令
         // Client name ip:port:port:name
-        args = new String[] { "", "127.0.0.1:8080:2000:android_test","127.0.0.1:5555:5555:android","127.0.0.1:8022:2200:android_test","127.0.0.1:80:2003:123" };
+        args = new String[] { "", "127.0.0.1:8081:8081:LNGNW1K289","127.0.0.1:5555:5555:LNGNW1K289","127.0.0.1:22:8022:LNGNW1K289","127.0.0.1:8686:8686:LNGNW1K289" };
+        
         // args=new String[]{};
         final Client client = new Client();
         if (args.length > 1) {
             MsgProcessorClient.myId = "456";
             client.initLocalServer();
+
+            
             client.init();
             for (int i = 1; i < args.length; i++) {
                 final String a[] = args[i].split(":");
@@ -50,7 +53,7 @@ public class Client {
                 client.map.put(Integer.parseInt(a[2]), connectPortRequestMsg);
                 try {
                     ServerBootstrap serverBootstrap = new ServerBootstrap();
-                    serverBootstrap.group(client.localServer, client.localServer).channel(NioServerSocketChannel.class).childOption(ChannelOption.SO_SNDBUF, 102400).childOption(ChannelOption.SO_RCVBUF, 102400)
+                    serverBootstrap.group(client.localServer, client.localServer).channel(NioServerSocketChannel.class)
                             .childOption(ChannelOption.TCP_NODELAY, true).option(ChannelOption.SO_BACKLOG, 128)
                             .childHandler(new ChannelInitializer<SocketChannel>() {
                                 @Override
@@ -69,7 +72,7 @@ public class Client {
             client.initLocal();
             client.init();
         }
-        client.connect("10.20.224.23", 8081);
+        client.connect("120.92.133.186", 8081);
     }
 
     public void initLocal() {
@@ -95,7 +98,7 @@ public class Client {
         b.channel(NioSocketChannel.class);
         b.option(ChannelOption.CONNECT_TIMEOUT_MILLIS, 1000);
         b.option(ChannelOption.SO_KEEPALIVE, false);
-        b.option(ChannelOption.TCP_NODELAY, true).option(ChannelOption.SO_SNDBUF, 102400).option(ChannelOption.SO_RCVBUF, 102400);
+        b.option(ChannelOption.TCP_NODELAY, true);
         b.handler(new ChannelInitializer<SocketChannel>() {
             @Override
             public void initChannel(SocketChannel ch) throws Exception {

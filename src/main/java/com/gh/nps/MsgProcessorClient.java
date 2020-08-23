@@ -17,23 +17,25 @@ import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.handler.timeout.IdleState;
 import io.netty.handler.timeout.IdleStateEvent;
+import io.netty.util.ReferenceCountUtil;
+import io.netty.util.concurrent.Future;
+import io.netty.util.concurrent.GenericFutureListener;
+import io.netty.util.internal.StringUtil;
 
 public class MsgProcessorClient extends ChannelInboundHandlerAdapter {
-    public  static String myId = "123";
+    public static String myId = "123";
     static int clientType = 1;
     ConcurrentHashMap<Integer, ConnectPortRequestMsg> map;
     EventLoopGroup server;
     EventLoopGroup local;
     ConcurrentHashMap<Long, Channel> connectId_channel;
-    ScheduledFuture<?> scheduleAtFixedRate;
 
-
-    public MsgProcessorClient(ConcurrentHashMap<Long, Channel> connectId_channel,EventLoopGroup local, EventLoopGroup server,
-            ConcurrentHashMap<Integer, ConnectPortRequestMsg> map) {
+    public MsgProcessorClient(ConcurrentHashMap<Long, Channel> connectId_channel, EventLoopGroup local,
+            EventLoopGroup server, ConcurrentHashMap<Integer, ConnectPortRequestMsg> map) {
         this.server = server;
         this.map = map;
         this.local = local;
-        this.connectId_channel=connectId_channel;
+        this.connectId_channel = connectId_channel;
     }
 
     @Override
@@ -42,7 +44,8 @@ public class MsgProcessorClient extends ChannelInboundHandlerAdapter {
         HelloMsg helloMsg = new HelloMsg(myId);
         helloMsg.clientType = clientType;
         ctx.channel().writeAndFlush(helloMsg);
-        Client.ctx=ctx;
+        Client.ctx = ctx;
+        System.out.println("服务器连接成功");
     }
 
     @Override
@@ -51,14 +54,16 @@ public class MsgProcessorClient extends ChannelInboundHandlerAdapter {
         for (Channel channel : connectId_channel.values()) {
             channel.close();
         }
-        Client.ctx=null;
-        scheduleAtFixedRate.cancel(false);
+        Client.ctx = null;
+        System.out.println("服务器断开连接");
     }
 
     @Override
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
         super.exceptionCaught(ctx, cause);
     }
+
+    volatile int readCount = 0;
 
     @Override
     public void channelRead(final ChannelHandlerContext ctx, Object msg) throws Exception {
@@ -69,9 +74,30 @@ public class MsgProcessorClient extends ChannelInboundHandlerAdapter {
             }
             if (message.type == -1) {
                 DataMsg dataMsg = (DataMsg) message;
+                final int size = dataMsg.data.readableBytes();
+                readCount += size;
+                if (readCount >= 1024 * 1024 * 2) {
+                    ctx.channel().config().setAutoRead(false);
+                }
                 Channel channel = connectId_channel.get(dataMsg.connectId);
                 if (channel != null) {
-                    channel.writeAndFlush(dataMsg.data);
+                    channel.writeAndFlush(dataMsg.data).addListener(new GenericFutureListener<Future<? super Void>>() {
+                        @Override
+                        public void operationComplete(Future<? super Void> future) throws Exception {
+                            readCount -= size;
+                            if (readCount < 1024 * 1024) {
+                                ctx.channel().config().setAutoRead(true);
+                                ctx.channel().read();
+                            }
+                        }
+                    });
+                }else{
+                    ReferenceCountUtil.release(dataMsg.data);
+                    readCount -= size;
+                    if (readCount < 1024 * 1024) {
+                        ctx.channel().config().setAutoRead(true);
+                        ctx.channel().read();
+                    }
                 }
                 return;
             }
@@ -97,7 +123,7 @@ public class MsgProcessorClient extends ChannelInboundHandlerAdapter {
                 bootstrap.channel(NioSocketChannel.class);
                 bootstrap.option(ChannelOption.CONNECT_TIMEOUT_MILLIS, 1000);
                 bootstrap.option(ChannelOption.SO_KEEPALIVE, false);
-                bootstrap.option(ChannelOption.TCP_NODELAY, true).option(ChannelOption.SO_SNDBUF, 102400).option(ChannelOption.SO_RCVBUF, 102400);
+                bootstrap.option(ChannelOption.TCP_NODELAY, true);
                 bootstrap.handler(new ChannelInitializer<SocketChannel>() {
                     @Override
                     public void initChannel(SocketChannel ch) throws Exception {
@@ -125,10 +151,16 @@ public class MsgProcessorClient extends ChannelInboundHandlerAdapter {
                 if (connectPortResponseMsg.result != 1 && channel != null) {
                     channel.close();
                     connectId_channel.remove(connectPortResponseMsg.connectId);
-                } else if(connectPortResponseMsg.result == 1&& channel != null){
+                    System.out.println("连接失败 "+ connectPortResponseMsg.result +" "+connectPortResponseMsg.userId);
+                } else if (connectPortResponseMsg.result == 1 && channel != null) {
                     channel.config().setAutoRead(true);
                     channel.attr(MsgLocalServerProcessor.Confirm).set("YES");
+                    System.out.println("连接成功");
                 }
+            }
+            if (message.type == 5) {
+                Onlines onlines = (Onlines) message;
+                System.out.println(StringUtil.join(",",onlines.list));
             }
         }
     }
@@ -137,10 +169,11 @@ public class MsgProcessorClient extends ChannelInboundHandlerAdapter {
     public void userEventTriggered(ChannelHandlerContext ctx, Object evt) throws Exception {
         if (evt instanceof IdleStateEvent) {
             IdleStateEvent e = (IdleStateEvent) evt;
-            if (e.state() == IdleState.READER_IDLE) {
+            if (e.state() == IdleState.READER_IDLE&&ctx.channel().attr(ClientInfo.NEED_CHECK_READ).get()!=null&&ctx.channel().attr(ClientInfo.NEED_CHECK_READ).get()) {
                 ctx.close().sync();
-            } else if (e.state() == IdleState.WRITER_IDLE) {
+            } else if (e.state() == IdleState.ALL_IDLE) {
                 ctx.writeAndFlush(new HeartBeatMsg(myId));
+                ctx.channel().attr(ClientInfo.NEED_CHECK_READ).set(true);
             }
         }
 

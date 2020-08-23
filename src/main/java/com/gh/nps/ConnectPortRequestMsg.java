@@ -10,5 +10,7 @@ public class ConnectPortRequestMsg extends Message {
     int port;
     int connectType;
     long connectId;
+    String cmd;
+    
 
 }

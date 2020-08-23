@@ -28,4 +28,10 @@ public class MsgEecoder extends MessageToByteEncoder<Message> {
         }
     }
 
+    @Override
+    public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
+        cause.printStackTrace();
+        ctx.close();
+    }
+
 }

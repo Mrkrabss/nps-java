@@ -33,17 +33,27 @@ public class MsgDecoder extends MessageToMessageDecoder<ByteBuf> {
                 case 4:
                     message = gson.fromJson(new String(data, StandardCharsets.UTF_8), ConnectPortResponseMsg.class);
                     break;
+                case 5:
+                    message = gson.fromJson(new String(data, StandardCharsets.UTF_8), Onlines.class);
+                    break;
                 default:
                     break;
             }
         } else if (type == -1) {
             long connectId = msg.readLong();
             message = new DataMsg("");
-            ((DataMsg)message).connectId = connectId;
-            ((DataMsg)message).data = msg;
+            ((DataMsg) message).connectId = connectId;
+            ((DataMsg) message).data = msg;
             ReferenceCountUtil.retain(msg);
         }
         out.add(message);
     }
+
+    @Override
+    public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
+        cause.printStackTrace();
+        ctx.close();
+    }
+    
 
 }

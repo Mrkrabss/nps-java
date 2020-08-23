@@ -1,5 +1,6 @@
 package com.gh.nps;
 
+import java.util.ArrayList;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
@@ -99,6 +100,14 @@ public class MsgProcessorServer extends ChannelInboundHandlerAdapter {
                 ctx.channel().attr(ClientInfo.CLIENT_INFO).set(clientInfo);
                 id_channel.put(helloMsg.userId, ctx);
                 System.out.println(helloMsg.userId + " hello");
+                ArrayList<String> list=new ArrayList<>();
+                for(String s:id_channel.keySet())
+                {
+                    list.add(s);
+                }
+                Onlines onlines=new Onlines(myId);
+                onlines.list=list;
+                ctx.writeAndFlush(onlines);
             } else if (!ctx.channel().hasAttr(ClientInfo.CLIENT_INFO)) {
                 ctx.channel().close();
                 return;
